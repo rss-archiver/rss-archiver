@@ -1,11 +1,13 @@
 [tool.poetry]
-name = "rss-archiver"
+name = "rss-archiver-api"
 version = "0.1.0"
 description = ""
 authors = ["Ryu1845 <ryu@tpgjbo.xyz>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+fastapi = {extras = ["all"], version = "^0.78.0"}
+SQLAlchemy = "^1.4.39"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
