@@ -1,0 +1,85 @@
+version: "3.7"
+
+services:
+  rabbitmq:
+    image: "bitnami/rabbitmq:3.7"
+    ports:
+      - "4369:4369"
+      - "5672:5672"
+      - "25672:25672"
+      - "15672:15672"
+    volumes:
+      - "rabbitmq_data:/bitnami"
+
+  redis:
+    image: "bitnami/redis:5.0.4"
+    environment:
+      - REDIS_PASSWORD=password123
+    ports:
+      - "6379:6379"
+    volumes:
+      - "redis_data:/bitnami/redis/data"
+
+  postgres:
+    image: postgres:14.1-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  rss-api:
+    build: ./rss/
+    ports:
+      - "8000:8000"
+    depends_on:
+      - rabbitmq
+      - redis
+      - postgres
+    command: "/usr/local/bin/uvicorn --host 0.0.0.0 rss_archiver.api:app"
+
+  rss-scheduler:
+    build: ./rss/
+    depends_on:
+      - rabbitmq
+      - redis
+      - postgres
+    command: "/usr/local/bin/celery -A rss_archiver.monitor beat -l info"
+
+  rss-worker:
+    build: ./rss/
+    depends_on:
+      - rabbitmq
+      - redis
+      - postgres
+    command: "/usr/local/bin/celery -A rss_archiver.monitor worker -l info"
+
+  celery-flower:
+    image: gregsi/latest-celery-flower-docker:latest
+    environment:
+      - AMQP_USERNAME=user
+      - AMQP_PASSWORD=bitnami
+      - AMQP_ADMIN_USERNAME=user
+      - AMQP_ADMIN_PASSWORD=bitnami
+      - AMQP_HOST=rabbitmq
+      - AMQP_PORT=5672
+      - AMQP_ADMIN_HOST=rabbitmq
+      - AMQP_ADMIN_PORT=15672
+      - FLOWER_BASIC_AUTH=user:test
+    ports:
+      - "5555:5555"
+    depends_on:
+      - worker
+
+  # html:
+  #   build: ./html/
+  #   command: "/usr/local/bin/uvicorn --host 0.0.0.0 html_archiver.main:app"
+
+volumes:
+  rabbitmq_data:
+    driver: local
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local

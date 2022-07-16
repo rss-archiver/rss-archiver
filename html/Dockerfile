@@ -6,7 +6,7 @@ ENV DOCKER=true
 
 COPY requirements.txt .
 
-COPY ./rss_archiver ./rss_archiver
+COPY ./html_archiver ./html_archiver
 
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
