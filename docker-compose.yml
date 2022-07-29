@@ -2,66 +2,92 @@ version: "3.7"
 
 services:
   rabbitmq:
-    image: "bitnami/rabbitmq:3.7"
+    image: "rabbitmq:3.10"
     ports:
       - "4369:4369"
       - "5672:5672"
       - "25672:25672"
       - "15672:15672"
     volumes:
-      - "rabbitmq_data:/bitnami"
+      - "rabbitmq_data:/var/lib/rabbitmq/"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
 
   redis:
-    image: "bitnami/redis:5.0.4"
+    image: "redis:7.0"
     environment:
       - REDIS_PASSWORD=password123
     ports:
       - "6379:6379"
     volumes:
-      - "redis_data:/bitnami/redis/data"
+      - "redis_data:/data"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
 
   postgres:
     image: postgres:14.1-alpine
+    command: ["postgres", "-c", "log_statement=all", "-c", "log_destination=stderr"]
     restart: always
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "postgres", "-U", "postgres" ]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 80s
 
   rss-api:
     build: ./rss/
     ports:
       - "8000:8000"
     depends_on:
-      - rabbitmq
-      - redis
-      - postgres
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     command: "/usr/local/bin/uvicorn --host 0.0.0.0 rss_archiver.api:app"
 
   rss-scheduler:
     build: ./rss/
     depends_on:
-      - rabbitmq
-      - redis
-      - postgres
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     command: "/usr/local/bin/celery -A rss_archiver.monitor beat -l info"
 
   rss-worker:
     build: ./rss/
     depends_on:
-      - rabbitmq
-      - redis
-      - postgres
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     command: "/usr/local/bin/celery -A rss_archiver.monitor worker -l info"
 
   celery-flower:
     image: gregsi/latest-celery-flower-docker:latest
     environment:
-      - AMQP_USERNAME=user
-      - AMQP_PASSWORD=bitnami
-      - AMQP_ADMIN_USERNAME=user
-      - AMQP_ADMIN_PASSWORD=bitnami
+      - AMQP_USERNAME=guest
+      - AMQP_PASSWORD=guest
+      - AMQP_ADMIN_USERNAME=guest
+      - AMQP_ADMIN_PASSWORD=guest
       - AMQP_HOST=rabbitmq
       - AMQP_PORT=5672
       - AMQP_ADMIN_HOST=rabbitmq
@@ -72,9 +98,14 @@ services:
     depends_on:
       - worker
 
-  # html:
-  #   build: ./html/
-  #   command: "/usr/local/bin/uvicorn --host 0.0.0.0 html_archiver.main:app"
+  html:
+    build: ./html/
+    command: "/usr/local/bin/uvicorn --host 0.0.0.0 html_archiver.main:app"
+    profiles:
+      - html
+      - everything
+    labels:
+      - "regex=.*"
 
 volumes:
   rabbitmq_data:
