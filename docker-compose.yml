@@ -47,7 +47,7 @@ services:
       start_period: 80s
 
   rss-api:
-    build: ./rss/
+    image: ghcr.io/rss-archiver/rss:latest
     ports:
       - "8000:8000"
     depends_on:
@@ -60,7 +60,7 @@ services:
     command: "/usr/local/bin/uvicorn --host 0.0.0.0 rss_archiver.api:app"
 
   rss-scheduler:
-    build: ./rss/
+    image: ghcr.io/rss-archiver/rss:latest
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -71,7 +71,7 @@ services:
     command: "/usr/local/bin/celery -A rss_archiver.monitor beat -l info"
 
   rss-worker:
-    build: ./rss/
+    image: ghcr.io/rss-archiver/rss:latest
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -99,7 +99,7 @@ services:
       - worker
 
   html:
-    build: ./html/
+    image: ghcr.io/rss-archiver/html:latest
     command: "/usr/local/bin/uvicorn --host 0.0.0.0 html_archiver.main:app"
     profiles:
       - html
